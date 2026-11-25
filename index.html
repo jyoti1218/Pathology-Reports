@@ -152,7 +152,7 @@
 
 <header class="top">
   <div class="brand">PathReport</div>
-  <span class="hint" id="verLabel" title="Version of this file">Version 226 · 2026-11-25</span>
+  <span class="hint" id="verLabel" title="Version of this file">Version 231 · 2026-11-25</span>
   <label class="sitepick">Site <select id="siteSelect" title="Choose the hospital you are working at"></select></label>
   <div class="spacer"></div>
   <span id="syncState" class="sync"></span>
@@ -190,7 +190,9 @@
         <button class="small" id="dashImportBtn" title="Bring in the cases saved inside an older PathReport file or a dashboard backup">Import cases from a file…</button>
       </div>
       <div class="dash-top" style="margin-top:-4px">
-        <button class="small primary" id="cloudBtn" hidden title="Sign in with your work Microsoft account to merge the dashboard and templates across computers">Sign in to sync</button>
+        <button class="small primary" id="fsBtn" hidden style="display:none" title="Keep this dashboard and your templates in a OneDrive folder on this computer; the OneDrive app carries it to your other computers. No sign-in or admin approval needed.">Sync with OneDrive folder</button>
+        <span class="hint" id="fsState"></span>
+        <button class="small primary" id="cloudBtn" hidden title="Sign in with your work Microsoft account; your data is kept in your OneDrive and merged across computers">Sign in with Microsoft</button>
         <span class="hint" id="cloudState" hidden></span>
         <button class="small primary" id="dashBackupBtn" title="Save a backup of the dashboard cases into a folder you choose (e.g. a folder in your OneDrive)">Back up cases to OneDrive</button>
         <label class="check"><input type="checkbox" id="dashAutoBackup"> Back up automatically after each change</label>
@@ -442,18 +444,25 @@
       </div>
     </div>
     <div class="savebox">
-      <h4>3. Cloud sync (online app)</h4>
-      <p>When PathReport is opened from its web address (GitHub Pages), you can sign in with your work Microsoft account. Your dashboard cases, templates, quick phrases and site formats are then merged through a private <b>Apps/PathReport</b> folder in your OneDrive, so every computer you sign in on has the same data. Nothing is stored on GitHub.</p>
+      <h4>3. OneDrive sync (Microsoft sign-in)</h4>
+      <p>When PathReport is opened from its Azure web address, it signs in with your work Microsoft account and keeps your dashboard cases, templates, quick phrases and sites in your own OneDrive (<b>Apps/PathReport</b>), merging them across every computer you use. OneDrive is the only place your data is stored; GitHub and Azure hold the app code only. The IDs are usually built in already; fill them in only if asked.</p>
       <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div><label class="blk">Application (client) ID from Azure</label><input id="cloudClientId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" style="width:100%"></div>
         <div><label class="blk">Directory (tenant) ID</label><input id="cloudTenantId" placeholder="organizations" style="width:100%"></div>
+      </div>
+      <div style="margin-top:8px"><label class="blk">OneDrive permission (match what your app registration has)</label>
+        <select id="cloudMode" style="width:100%"><option value="app">App folder only: Files.ReadWrite.AppFolder (OneDrive › Apps › PathReport)</option><option value="files">My files: Files.ReadWrite (OneDrive › PathReport folder)</option><option value="filesall">All my files: Files.ReadWrite.All (OneDrive › PathReport folder)</option><option value="sites">Sites: Sites.ReadWrite.All (OneDrive › PathReport folder)</option></select></div>
+      <div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:8px">
+        <b>Not sure which permission Oculus allows?</b> Save the IDs first, then test each row below. Each test opens a Microsoft sign-in window.
+        If it says <i>Need admin approval</i>, click <i>Return to the application without granting consent</i> (or close the window), then test the next row.
+        <table id="probeTbl" style="width:100%;margin-top:6px;font-size:13px;border-collapse:collapse"></table>
       </div>
       <div class="btnrow" style="margin-top:8px"><button id="cloudSaveCfg">Save sync settings</button><button id="cloudSignOut">Sign out</button></div>
       <p class="hint" id="cloudCfgInfo"></p>
     </div>
     <div class="savebox">
-      <h4>4. Publish new versions to GitHub</h4>
-      <p>When you open a newer PathReport file on this computer, it uploads itself to your GitHub repository (without any of your data), and your online app updates about a minute later. Uses a GitHub fine-grained token that can only change that one repository; it is kept only in this browser.</p>
+      <h4>4. GitHub: app updates and template sync (no patient data)</h4>
+      <p>When you open a newer PathReport file on this computer, it uploads its code to your GitHub repository (never any data), and Azure redeploys the online app a few minutes later. Uses a GitHub fine-grained token that can only change that one repository; it is kept only in this browser.</p>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
         <div><label class="blk">GitHub user name</label><input id="ghOwner" placeholder="yourname" style="width:100%"></div>
         <div><label class="blk">Repository</label><input id="ghRepo" placeholder="pathreport" style="width:100%"></div>
@@ -461,7 +470,8 @@
       </div>
       <div style="margin-top:8px"><label class="blk">Token (github_pat_…)</label><input id="ghToken" type="password" autocomplete="off" placeholder="paste once; stays on this computer" style="width:100%"></div>
       <label style="display:block;margin-top:6px"><input type="checkbox" id="ghAuto" checked> Publish automatically when I open a newer version</label>
-      <div class="btnrow" style="margin-top:8px"><button id="ghSave">Save</button><button id="ghNow">Publish this version now</button><button id="ghFileBtn">Publish a version file…</button><input type="file" id="ghFile" accept=".html,text/html" hidden></div>
+      <label style="display:block;margin-top:4px"><input type="checkbox" id="ghTpl" checked> Keep templates, quick phrases and site formats in sync through GitHub (saved a few seconds after each change; dashboard cases are never sent)</label>
+      <div class="btnrow" style="margin-top:8px"><button id="ghSave">Save</button><button id="ghNow">Publish this version now</button><button id="ghFileBtn">Publish a version file…</button><button id="ghForget">Remove token from this computer</button><input type="file" id="ghFile" accept=".html,text/html" hidden></div>
       <p class="hint" id="ghInfo"></p>
     </div>
     <div class="savebox">
@@ -1246,7 +1256,7 @@ function persist() {
   if (!window.__dashSaving && !window.__cloudApplying) S.setAt = S.savedAt;   // last change to templates/sites/phrases (not dashboard)
   try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {}
   updateSyncState();
-  if (!window.__dashSaving && !window.__cloudApplying) cloudSoon();
+  if (!window.__dashSaving && !window.__cloudApplying) { try { cloudSoon(); fsSoon(); tplSoon(); } catch (e) {} }
 }
 function updateSyncState() {
   const el = $('#syncState');
@@ -4206,7 +4216,7 @@ function dashSiteList() {
 function dashCases() { if (!Array.isArray(S.cases)) S.cases = []; return S.cases; }
 function dashSave() {
   window.__dashSaving = true; try { persist(); } finally { window.__dashSaving = false; }
-  cloudSoon();
+  try { cloudSoon(); fsSoon(); } catch (e) {}
   dashAutoBackupSoon();
   try { localStorage.setItem(LS_CASES, JSON.stringify({ cases: S.cases || [], casesDeleted: S.casesDeleted || [] })); } catch (e) {}
   dashStats();
@@ -4344,45 +4354,176 @@ $('#dashBackupBtn').addEventListener('contextmenu', async e => {   // right-clic
 $('#dashAutoBackup').onchange = () => { try { localStorage.setItem('pathreport.autoBackup', $('#dashAutoBackup').checked ? '1' : ''); } catch (e) {} if ($('#dashAutoBackup').checked) dashBackup(true); };
 try { $('#dashAutoBackup').checked = localStorage.getItem('pathreport.autoBackup') === '1'; } catch (e) {}
 bkGet().then(d => { if (d) bkState('Backups go to the "' + d.name + '" folder (right-click the button to change it).'); });
+/* ---------- Folder sync through the OneDrive desktop app (no sign-in, no admin approval) ----------
+   You pick a folder inside your OneDrive once on each computer/browser. Each copy of PathReport writes only its own file
+   (PathReport-sync-<device>.json), so OneDrive never has conflicts, and reads everyone else's to merge:
+   dashboard cases merge case by case (newest edit wins, deletions stick); templates/phrases/sites: newest change wins. */
+const FS_KEY = 'pathreport.folderSync';
+const LOCAL_ONLY = ['cases', 'casesDeleted', 'tplSeen', 'cloud', 'cloudSeen', 'cloudSnapDay', 'cloudSnapVer', 'fsSeen', 'fsSnapDay', 'fsSnapVer', 'ghsSeen', 'ghsSnapDay', 'ghsSnapVer'];
+const FS_DEVICE = (() => { try { let d = localStorage.getItem('pathreport.device'); if (!d) { d = Math.random().toString(36).slice(2, 8); localStorage.setItem('pathreport.device', d); } return d; } catch (e) { return 'x' + Math.random().toString(36).slice(2, 7); } })();
+let fsDir = null, fsBusy = false, fsTimer = 0;
+async function fsHandle() { try { const db = await bkDb(); return await new Promise(res => { const q = db.transaction(BK_STORE).objectStore(BK_STORE).get('sync'); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); } catch (e) { return null; } }
+async function fsSaveHandle(h) { try { const db = await bkDb(); await new Promise(res => { const tx = db.transaction(BK_STORE, 'readwrite'); tx.objectStore(BK_STORE).put(h, 'sync'); tx.oncomplete = res; tx.onerror = res; }); } catch (e) {} }
+function fsSay(m) { const el = $('#fsState'); if (el) el.textContent = m; }
+function settingsOnly() { const o = JSON.parse(JSON.stringify(S)); LOCAL_ONLY.forEach(k => delete o[k]); return o; }
+function quietPersist() { window.__cloudApplying = true; try { persist(); } finally { window.__cloudApplying = false; } }
+async function fsSync(interactive) {
+  if (fsBusy) return; if (!window.showDirectoryPicker) { if (interactive) toast('Folder sync needs Chrome or Microsoft Edge.'); return; }
+  fsBusy = true;
+  try {
+    if (!fsDir) fsDir = await fsHandle();
+    if (fsDir) {
+      let perm = await fsDir.queryPermission({ mode: 'readwrite' });
+      if (perm !== 'granted' && interactive) perm = await fsDir.requestPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') { fsSay('Paused: click "Sync with OneDrive folder" to resume.'); if (!interactive) return; fsDir = null; }
+    }
+    if (!fsDir) {
+      if (!interactive) return;
+      toast('Choose (or create) a folder inside your OneDrive, e.g. OneDrive › PathReport Sync. Use the same folder on every computer.');
+      fsDir = await window.showDirectoryPicker({ id: 'pathreport-sync', mode: 'readwrite' });
+      await fsSaveHandle(fsDir); try { localStorage.setItem(FS_KEY, '1'); } catch (e) {}
+    }
+    // read everyone else's files
+    const others = [];
+    for await (const [name, h] of fsDir.entries()) {
+      if (h.kind !== 'file' || !/^PathReport-sync-.+\.json$/.test(name) || name === 'PathReport-sync-' + FS_DEVICE + '.json') continue;
+      try { const d = JSON.parse(await (await h.getFile()).text()); if (d && d.app === 'PathReport sync') others.push(d); } catch (e) {}
+    }
+    const del = [...new Set([...(S.casesDeleted || []), ...others.flatMap(o => o.casesDeleted || [])])].slice(-2000);
+    const merged = mergeCases(S.cases || [], ...others.map(o => o.cases || []), del);
+    if (JSON.stringify(merged) !== JSON.stringify(S.cases || []) || del.length !== (S.casesDeleted || []).length) {
+      S.cases = merged; S.casesDeleted = del;
+      window.__dashSaving = true; try { quietPersist(); localStorage.setItem(LS_CASES, JSON.stringify({ cases: S.cases, casesDeleted: S.casesDeleted })); } catch (e) {} finally { window.__dashSaving = false; }
+      if (document.body.dataset.view === 'dashboard') dashRender(); else dashStats();
+    }
+    // templates etc.: newest wins; the first time a copy joins, an existing folder copy wins
+    const newest = others.filter(o => o.settings).sort((a, b) => (b.setAt || 0) - (a.setAt || 0))[0];
+    if (newest && (!S.fsSeen || (newest.setAt || 0) > (S.setAt || 0))) {
+      const keep = {}; LOCAL_ONLY.forEach(k => keep[k] = S[k]); keep.fsSeen = true;
+      const ns = Object.assign(newest.settings, keep); ns.setAt = newest.setAt;
+      try { localStorage.setItem(LS_KEY, JSON.stringify(ns)); } catch (e) {}
+      await fsWriteOwn(ns);
+      toast('Templates and settings updated from your other computer. Reloading…'); setTimeout(() => location.reload(), 1200); return;
+    }
+    if (!S.fsSeen) { S.fsSeen = true; quietPersist(); }
+    await fsWriteOwn(S);
+    // dated snapshot: once a day and whenever the app version changes
+    const day = new Date().toISOString().slice(0, 10), ver = verNum($('#verLabel').outerHTML);
+    if (S.fsSnapDay !== day || S.fsSnapVer !== ver) {
+      const bk = await fsDir.getDirectoryHandle('backups', { create: true });
+      await bkWrite(bk, 'PathReport-backup-' + day + '-v' + ver + '-' + FS_DEVICE + '.json', JSON.stringify({ app: 'PathReport dashboard backup', version: ver, savedAt: new Date().toISOString(), cases: S.cases, casesDeleted: S.casesDeleted, settings: settingsOnly() }));
+      S.fsSnapDay = day; S.fsSnapVer = ver; quietPersist();
+    }
+    const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    fsSay('Synced ' + t + ' with "' + fsDir.name + '"' + (others.length ? ' · ' + others.length + ' other cop' + (others.length > 1 ? 'ies' : 'y') : '') + '.');
+    if (interactive) toast('Synced with the "' + fsDir.name + '" folder.');
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    fsSay('Sync problem (' + (e && e.message || e) + '). Your data is still saved in this browser.');
+  } finally { fsBusy = false; }
+}
+async function fsWriteOwn(st) {
+  const o = JSON.parse(JSON.stringify(st)); const cases = o.cases || [], del = o.casesDeleted || [];
+  LOCAL_ONLY.forEach(k => delete o[k]);
+  await bkWrite(fsDir, 'PathReport-sync-' + FS_DEVICE + '.json', JSON.stringify({ app: 'PathReport sync', device: FS_DEVICE, savedAt: Date.now(), setAt: st.setAt || 0, version: verNum($('#verLabel').outerHTML), cases, casesDeleted: del, settings: o }));
+}
+function fsSoon() { if (!fsDir) return; clearTimeout(fsTimer); fsTimer = setTimeout(() => fsSync(false), 2000); }
+$('#fsBtn').onclick = () => fsSync(true);
+$('#fsBtn').addEventListener('contextmenu', async e => {   // right-click: choose a different folder
+  if (!window.showDirectoryPicker) return; e.preventDefault();
+  try { fsDir = await window.showDirectoryPicker({ id: 'pathreport-sync', mode: 'readwrite' }); await fsSaveHandle(fsDir); fsSync(true); } catch (err) {}
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden && fsDir) fsSync(false); });
+setInterval(() => { if (!document.hidden && fsDir) fsSync(false); }, 60000);
+fsHandle().then(h => { if (h) { $('#fsBtn').hidden = false; fsDir = h; fsSay('Syncing with "' + h.name + '"…'); fsSync(false); } else fsSay(''); });
+/* ---------- Permission tester: finds which OneDrive permission your organization lets you approve yourself ---------- */
+const PROBES_GET = () => [['signin', 'User.Read', 'Sign in only (checks the app registration itself)'], ...Object.entries(CLOUD_MODES).map(([k, v]) => [k, v.scope, v.label])];
+const probeRes = {};
+function probeRender() {
+  const t = $('#probeTbl'); if (!t) return;
+  t.innerHTML = PROBES_GET().map(([k, sc, lab]) => { const r = probeRes[k] || {};
+    return '<tr style="border-top:1px solid var(--line)"><td style="padding:4px"><code>' + esc(sc) + '</code><br><span class="hint">' + esc(lab) + '</span></td>' +
+      '<td style="padding:4px;width:42%">' + (r.ok ? '<b style="color:#1b7f3b">Works</b>' : r.msg ? '<span style="color:#b00020">' + esc(r.msg) + '</span>' : '') + '</td>' +
+      '<td style="padding:4px;white-space:nowrap;text-align:right"><button class="small" data-probe="' + k + '">Test</button>' + (r.ok && k !== 'signin' ? ' <button class="small primary" data-use="' + k + '">Use this</button>' : '') + '</td></tr>'; }).join('');
+}
+function probeExplain(e) {
+  const m = ((e && (e.errorMessage || e.message)) || '') + ' ' + ((e && e.errorCode) || '');
+  if (/AADSTS90094|AADSTS90095|AADSTS65001|consent_required|access_denied|interaction_required/i.test(m)) return 'Needs admin approval';
+  if (/AADSTS50020|does not exist in tenant/i.test(m)) return 'Your account is not in the tenant where the app is registered: register the app while signed in with your Oculus account';
+  if (/AADSTS700016|not found in the directory/i.test(m)) return 'Client ID not found in that tenant: check the Client ID and Tenant ID';
+  if (/AADSTS50011|redirect/i.test(m)) return 'Redirect URI missing: add ' + location.origin + location.pathname + ' as a Single-page application redirect URI';
+  if (/user_cancelled|popup_window_error|cancel/i.test(m)) return 'Window closed or blocked (allow pop-ups for this site and try again)';
+  return 'Failed: ' + m.trim().slice(0, 160);
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-probe],[data-use]'); if (!b || !b.closest('#probeTbl')) return;
+  if (b.dataset.use) {
+    const m = b.dataset.use; S.cloud = Object.assign({}, S.cloud || {}, { mode: m }); quietPersist();
+    toast('Using ' + CLOUD_MODES[m].scope + '. Reloading…'); setTimeout(() => location.reload(), 800); return;
+  }
+  const k = b.dataset.probe, sc = PROBES_GET().find(p => p[0] === k)[1];
+  if (!cloudApp) { probeRes[k] = { msg: cloudAvailable() ? 'Fill in the Client ID and Tenant ID above and click Save sync settings first' : 'Open PathReport from its web address (https) to test' }; probeRender(); return; }
+  probeRes[k] = { msg: 'Waiting for the sign-in window…' }; probeRender();
+  try {
+    const r = await cloudApp.acquireTokenPopup({ scopes: sc === 'User.Read' ? ['User.Read'] : ['User.Read', sc], account: cloudAcct || undefined, prompt: cloudAcct ? undefined : 'select_account' });
+    if (r.account) { cloudAcct = r.account; cloudApp.setActiveAccount(cloudAcct); }
+    // prove it really works against OneDrive
+    const url = k === 'signin' ? 'https://graph.microsoft.com/v1.0/me' : k === 'app' ? 'https://graph.microsoft.com/v1.0/me/drive/special/approot' : 'https://graph.microsoft.com/v1.0/me/drive/root';
+    const g = await fetch(url, { headers: { Authorization: 'Bearer ' + r.accessToken } });
+    probeRes[k] = g.ok ? { ok: true } : { msg: 'Signed in, but OneDrive answered ' + g.status + (g.status === 403 ? ' (blocked by your organization)' : '') };
+  } catch (err) { probeRes[k] = { msg: probeExplain(err) }; }
+  probeRender();
+});
+setTimeout(probeRender, 0);
 /* ---------- Cloud sync: work Microsoft account + OneDrive app folder (Microsoft Graph) ----------
-   Works when the app is opened from https (GitHub Pages) and an Azure app registration (SPA) exists.
+   Works when the app is opened from https (Azure Static Web Apps) and an Entra app registration (SPA) exists.
    Files: Apps/PathReport/PathReport-dashboard.json (cases merged case by case) and PathReport-settings.json (newest wins). */
-const CLOUD_DEFAULT = { clientId: '', tenantId: 'organizations' };   // fill in clientId here for a GitHub Pages copy
-const CLOUD_SCOPES = ['User.Read', 'Files.ReadWrite.AppFolder'];
-const GRAPH = 'https://graph.microsoft.com/v1.0/me/drive/special/approot';
+const CLOUD_DEFAULT = { clientId: '', tenantId: 'organizations', mode: 'app' };   // fill in clientId here for a GitHub Pages copy
+// 'app' = Files.ReadWrite.AppFolder (OneDrive › Apps › PathReport); 'files' = Files.ReadWrite (OneDrive › PathReport) — use whichever your organization lets you approve
+const CLOUD_MODES = {
+  app: { scope: 'Files.ReadWrite.AppFolder', label: 'App folder only (OneDrive › Apps › PathReport)' },
+  files: { scope: 'Files.ReadWrite', label: 'My files (OneDrive › PathReport folder)' },
+  filesall: { scope: 'Files.ReadWrite.All', label: 'All my files (OneDrive › PathReport folder)' },
+  sites: { scope: 'Sites.ReadWrite.All', label: 'Sites (OneDrive › PathReport folder)' }
+};
+function cloudMode() { const c = S.cloud || {}; const m = c.mode || CLOUD_DEFAULT.mode; return CLOUD_MODES[m] ? m : 'app'; }
+let CLOUD_SCOPES = ['User.Read', 'Files.ReadWrite.AppFolder'];
+function graphUrl(name) { return cloudMode() !== 'app' ? 'https://graph.microsoft.com/v1.0/me/drive/root:/PathReport/' + name : 'https://graph.microsoft.com/v1.0/me/drive/special/approot:/' + name; }
 let cloudApp = null, cloudAcct = null, cloudBusy = false, cloudTimer = 0;
-function cloudCfg() { const c = S.cloud || {}; return { clientId: (c.clientId || CLOUD_DEFAULT.clientId || '').trim(), tenantId: (c.tenantId || CLOUD_DEFAULT.tenantId || 'organizations').trim() }; }
+function cloudCfg() { const c = S.cloud || {}; return { clientId: (c.clientId || CLOUD_DEFAULT.clientId || '').trim(), tenantId: (c.tenantId || CLOUD_DEFAULT.tenantId || 'organizations').trim(), mode: cloudMode() }; }
 function cloudAvailable() { return /^https:$/.test(location.protocol) || location.hostname === 'localhost' || location.hostname === '127.0.0.1'; }
 function cloudSay(msg) { const el = $('#cloudState'); if (el) { el.hidden = false; el.textContent = msg; } }
 async function cloudInit() {
   const btn = $('#cloudBtn');
   if (!cloudAvailable()) { if (btn) btn.hidden = true; $('#cloudCfgInfo').textContent = 'Cloud sync works when PathReport is opened from its web address (https), not from a file on this computer.'; return; }
   const cfg = cloudCfg();
+  CLOUD_SCOPES = ['User.Read', CLOUD_MODES[cfg.mode].scope];
   btn.hidden = false;
-  if (!cfg.clientId) { btn.textContent = 'Set up cloud sync'; cloudSay('Not set up yet.'); return; }
+  if (!cfg.clientId) { btn.textContent = 'Set up OneDrive sync'; cloudSay('Not set up yet.'); return; }
   if (!window.msal) { cloudSay('Sign-in library missing.'); return; }
   cloudApp = new msal.PublicClientApplication({ auth: { clientId: cfg.clientId, authority: 'https://login.microsoftonline.com/' + cfg.tenantId, redirectUri: location.origin + location.pathname },
     cache: { cacheLocation: 'localStorage' } });
   await cloudApp.initialize();
   try { const r = await cloudApp.handleRedirectPromise(); if (r && r.account) cloudApp.setActiveAccount(r.account); } catch (e) {}
   cloudAcct = cloudApp.getActiveAccount() || cloudApp.getAllAccounts()[0] || null;
+  if (!cloudAcct) { try { const r = await cloudApp.ssoSilent({ scopes: CLOUD_SCOPES }); if (r && r.account) cloudAcct = r.account; } catch (e) {} }   // already signed in to Microsoft (e.g. through the Azure site login): no extra click
   if (cloudAcct) { cloudApp.setActiveAccount(cloudAcct); btn.textContent = 'Sync now'; cloudSync(); }
-  else { btn.textContent = 'Sign in to sync'; cloudSay('Signed out.'); }
+  else { btn.textContent = 'Sign in with Microsoft'; cloudSay('Not signed in: data is saved in this browser only until you sign in.'); let fs = ''; try { fs = localStorage.getItem(FS_KEY); } catch (e) {} if (fs) { btn.hidden = true; $('#cloudState').hidden = true; } }
 }
 async function cloudToken() {
   try { return (await cloudApp.acquireTokenSilent({ scopes: CLOUD_SCOPES, account: cloudAcct })).accessToken; }
   catch (e) { return (await cloudApp.acquireTokenPopup({ scopes: CLOUD_SCOPES, account: cloudAcct })).accessToken; }
 }
 async function cloudGet(name, tok) {
-  const r = await fetch(GRAPH + ':/' + name + ':/content', { headers: { Authorization: 'Bearer ' + tok } });
+  const r = await fetch(graphUrl(name) + ':/content', { headers: { Authorization: 'Bearer ' + tok } });
   if (r.status === 404) return { data: null, etag: null };
   if (!r.ok) throw new Error('read ' + name + ' ' + r.status);
-  const meta = await fetch(GRAPH + ':/' + name, { headers: { Authorization: 'Bearer ' + tok } }).then(x => x.ok ? x.json() : {});
+  const meta = await fetch(graphUrl(name), { headers: { Authorization: 'Bearer ' + tok } }).then(x => x.ok ? x.json() : {});
   return { data: await r.json(), etag: meta.eTag || null };
 }
 async function cloudPut(name, tok, obj, etag) {
   const h = { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }; if (etag) h['If-Match'] = etag;
-  const r = await fetch(GRAPH + ':/' + name + ':/content', { method: 'PUT', headers: h, body: JSON.stringify(obj) });
+  const r = await fetch(graphUrl(name) + ':/content', { method: 'PUT', headers: h, body: JSON.stringify(obj) });
   if (r.status === 412) return false;                      // changed elsewhere meanwhile: merge again
   if (!r.ok) throw new Error('save ' + name + ' ' + r.status);
   return true;
@@ -4405,10 +4546,10 @@ async function cloudSync() {
     }
     // templates, quick phrases and sites: the newer copy wins
     const { data: rs, etag: se } = await cloudGet('PathReport-settings.json', tok);
-    const local = (() => { const o = JSON.parse(JSON.stringify(S)); delete o.cases; delete o.casesDeleted; delete o.cloud; delete o.cloudSeen; delete o.cloudSnapDay; delete o.cloudSnapVer; return o; })();
+    const local = (() => { const o = JSON.parse(JSON.stringify(S)); delete o.cases; delete o.casesDeleted; delete o.cloud; delete o.cloudSeen; delete o.cloudSnapDay; delete o.cloudSnapVer; LOCAL_ONLY.forEach(k => delete o[k]); return o; })();
     // the first time a computer syncs, an existing cloud copy wins (so a new computer never pushes its starter templates over yours)
     if (rs && (!S.cloudSeen || (rs.setAt || 0) > (S.setAt || 0))) {
-      const keep = { cases: S.cases, casesDeleted: S.casesDeleted, cloud: S.cloud, cloudSeen: true, cloudSnapDay: S.cloudSnapDay, cloudSnapVer: S.cloudSnapVer };
+      const keep = {}; LOCAL_ONLY.forEach(k => keep[k] = S[k]); keep.cloudSeen = true;
       window.__cloudApplying = true;
       try { S = Object.assign(rs, keep); S.setAt = rs.setAt; localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} finally { window.__cloudApplying = false; }
       toast('Templates and settings updated from your other computer. Reloading…');
@@ -4439,26 +4580,29 @@ $('#cloudBtn').onclick = async () => {
   cloudSync();
 };
 $('#cloudSaveCfg').onclick = () => {
-  S.cloud = { clientId: $('#cloudClientId').value.trim(), tenantId: $('#cloudTenantId').value.trim() || 'organizations' };
+  S.cloud = { clientId: $('#cloudClientId').value.trim(), tenantId: $('#cloudTenantId').value.trim() || 'organizations', mode: $('#cloudMode').value };
   window.__cloudApplying = true; try { persist(); } finally { window.__cloudApplying = false; }
   toast('Sync settings saved. Reloading…'); setTimeout(() => location.reload(), 800);
 };
 $('#cloudSignOut').onclick = async () => {
   if (cloudApp && cloudAcct) { try { await cloudApp.logoutPopup({ account: cloudAcct }); } catch (e) {} }
-  cloudAcct = null; $('#cloudBtn').textContent = 'Sign in to sync'; cloudSay('Signed out.');
+  cloudAcct = null; $('#cloudBtn').textContent = 'Sign in with Microsoft'; cloudSay('Signed out.');
 };
 document.addEventListener('visibilitychange', () => { if (!document.hidden) cloudSoon(); });
 setInterval(() => { if (!document.hidden) cloudSync(); }, 120000);
-setTimeout(() => { const c = cloudCfg(); $('#cloudClientId').value = (S.cloud && S.cloud.clientId) || ''; $('#cloudTenantId').value = (S.cloud && S.cloud.tenantId) || ''; $('#cloudClientId').placeholder = c.clientId || 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'; cloudInit().catch(e => cloudSay('Sync unavailable: ' + (e.message || e))); }, 0);
+setTimeout(() => { const c = cloudCfg(); $('#cloudClientId').value = (S.cloud && S.cloud.clientId) || ''; $('#cloudTenantId').value = (S.cloud && S.cloud.tenantId) || ''; $('#cloudMode').value = cloudMode(); $('#cloudClientId').placeholder = c.clientId || 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'; cloudInit().catch(e => cloudSay('Sync unavailable: ' + (e.message || e))); }, 0);
 /* ---------- Publish new versions to GitHub (code only, never data) ---------- */
 const GH_KEY = 'pathreport.github.v1';
-function ghCfg() { try { return Object.assign({ owner: '', repo: '', branch: 'main', token: '', auto: true }, JSON.parse(localStorage.getItem(GH_KEY)) || {}); } catch (e) { return { owner: '', repo: '', branch: 'main', token: '', auto: true }; } }
+function ghCfg() {
+  let c; try { c = Object.assign({ owner: '', repo: '', branch: 'main', token: '', auto: true }, JSON.parse(localStorage.getItem(GH_KEY)) || {}); } catch (e) { c = { owner: '', repo: '', branch: 'main', token: '', auto: true }; }
+  return c;
+}
 function verNum(html) { const m = String(html).match(/id="verLabel"[^>]*>\s*Version (\d+)/); return m ? +m[1] : 0; }
 function cleanForPublish(html) {
   // strip any data saved inside the file, and build in the cloud sign-in IDs so the online copy needs no setup
   html = html.replace(/(<script type="application\/json" id="embedded">)[\s\S]*?(<\/script>)/, '$1null$2');
   const c = cloudCfg();
-  if (c.clientId) html = html.replace(/const CLOUD_DEFAULT = \{[^}]*\};/, 'const CLOUD_DEFAULT = ' + JSON.stringify({ clientId: c.clientId, tenantId: c.tenantId }).replace(/"/g, "'") + ';');
+  if (c.clientId) html = html.replace(/const CLOUD_DEFAULT = \{[^}]*\};/, 'const CLOUD_DEFAULT = ' + JSON.stringify({ clientId: c.clientId, tenantId: c.tenantId, mode: c.mode }).replace(/"/g, "'") + ';');
   const em = html.match(/<script type="application\/json" id="embedded">([\s\S]*?)<\/script>/);
   if (!em || em[1] !== 'null') throw new Error('data still embedded; not published');
   return html;
@@ -4495,20 +4639,71 @@ async function ghRun(html, force, quiet) {
 }
 (() => {
   const g = ghCfg();
-  $('#ghOwner').value = g.owner; $('#ghRepo').value = g.repo; $('#ghBranch').value = g.branch || 'main'; $('#ghAuto').checked = g.auto !== false;
+  $('#ghOwner').value = g.owner; $('#ghRepo').value = g.repo; $('#ghBranch').value = g.branch || 'main'; $('#ghAuto').checked = g.auto !== false; $('#ghTpl').checked = g.tpl !== false;
   $('#ghToken').placeholder = g.token ? 'saved on this computer (paste a new one to replace)' : 'paste once; stays on this computer';
   ghSay(g.token ? 'Set up for ' + g.owner + '/' + g.repo + '.' : 'Not set up on this computer.');
   $('#ghSave').onclick = () => {
-    const n = { owner: $('#ghOwner').value.trim(), repo: $('#ghRepo').value.trim(), branch: $('#ghBranch').value.trim() || 'main', token: $('#ghToken').value.trim() || ghCfg().token, auto: $('#ghAuto').checked };
+    const n = { owner: $('#ghOwner').value.trim(), repo: $('#ghRepo').value.trim(), branch: $('#ghBranch').value.trim() || 'main', token: $('#ghToken').value.trim() || ghCfg().token, auto: $('#ghAuto').checked, tpl: $('#ghTpl').checked };
     try { localStorage.setItem(GH_KEY, JSON.stringify(n)); } catch (e) {}
-    $('#ghToken').value = ''; ghSay('Saved. Checking GitHub…'); ghRun(PRISTINE, false, true);
+    $('#ghToken').value = ''; ghSay('Saved. Checking GitHub…'); ghRun(PRISTINE, false, true); setTimeout(() => tplSync(true), 2500);
   };
   $('#ghNow').onclick = () => ghRun(PRISTINE, false, false);
   $('#ghFileBtn').onclick = () => $('#ghFile').click();
   $('#ghFile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; const t = await f.text(); if (!verNum(t)) { toast('That does not look like a PathReport file.'); return; } ghRun(t, false, false); };
   // a newer copy opened on this computer publishes itself
   if (g.auto !== false && g.token && g.owner && g.repo && location.hostname !== g.owner.toLowerCase() + '.github.io') setTimeout(() => ghRun(PRISTINE, false, true), 1500);
+  $('#ghForget').onclick = () => { const c = ghCfg(); delete c.token; try { localStorage.setItem(GH_KEY, JSON.stringify(c)); } catch (e) {} ghSay('Token removed from this computer.'); toast('GitHub token removed from this computer.'); };
 })();
+/* ---------- Template sync through GitHub ----------
+   Templates, quick phrases and site formats (never dashboard cases) are kept in pathreport-settings.json in your GitHub repository.
+   A change on any computer is saved there a few seconds later; every other computer picks it up when it opens or every 2 minutes. */
+const TPL_FILE = 'pathreport-settings.json';
+let tplTimer = 0, tplBusy = false, tplLast = null;
+function tplOn() { const g = ghCfg(); return g.tpl !== false && g.token && g.owner && g.repo; }
+function tplPayload() { const so = settingsOnly(); delete so.savedAt; delete so.fileSavedAt; return so; }
+async function tplApi(method, body, raw) {
+  const g = ghCfg();
+  return fetch('https://api.github.com/repos/' + encodeURIComponent(g.owner) + '/' + encodeURIComponent(g.repo) + '/contents/' + TPL_FILE + (method === 'GET' ? '?ref=' + encodeURIComponent(g.branch || 'main') : ''), {
+    method, cache: 'no-store', body: body ? JSON.stringify(body) : undefined,
+    headers: { Authorization: 'Bearer ' + g.token, Accept: raw ? 'application/vnd.github.raw' : 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', ...(body ? { 'Content-Type': 'application/json' } : {}) } });
+}
+async function tplSync(interactive) {
+  if (!tplOn() || tplBusy) return; tplBusy = true;
+  try {
+    const meta = await tplApi('GET');
+    let remote = null, sha = null;
+    if (meta.ok) { sha = (await meta.json()).sha; const r = await tplApi('GET', null, true); if (r.ok) remote = JSON.parse(await r.text()); }
+    else if (meta.status !== 404) throw new Error('GitHub ' + meta.status + (meta.status === 401 ? ' (token expired or wrong)' : ''));
+    if (remote && remote.settings && (!S.tplSeen || (remote.setAt || 0) > (S.setAt || 0))) {
+      if (JSON.stringify(remote.settings) !== JSON.stringify(tplPayload())) {
+        const keep = {}; LOCAL_ONLY.forEach(k => keep[k] = S[k]); keep.tplSeen = true;
+        const ns = Object.assign(remote.settings, keep); ns.setAt = remote.setAt;
+        try { localStorage.setItem(LS_KEY, JSON.stringify(ns)); } catch (e) {}
+        toast('Templates updated from your other computer. Reloading…'); setTimeout(() => location.reload(), 1200); return;
+      }
+      S.tplSeen = true; S.setAt = Math.max(S.setAt || 0, remote.setAt || 0); quietPersist(); tplLast = JSON.stringify(tplPayload());
+    }
+    if (!S.tplSeen) { S.tplSeen = true; quietPersist(); }
+    const mine = JSON.stringify(tplPayload());
+    const changed = !remote || (S.setAt || 0) > (remote.setAt || 0);
+    if (changed && mine !== tplLast) {
+      const doc = JSON.stringify({ app: 'PathReport settings', note: 'Templates, quick phrases and site formats only. No patient data.', setAt: S.setAt || Date.now(), version: verNum($('#verLabel').outerHTML), settings: JSON.parse(mine) }, null, 1);
+      if (/"cases"\s*:/.test(doc.replace(/"settings"[\s\S]*$/, ''))) throw new Error('refused: dashboard data found');
+      const body = { message: 'Templates updated', content: b64utf8(doc), branch: ghCfg().branch || 'main' }; if (sha) body.sha = sha;
+      const put = await tplApi('PUT', body);
+      if (put.status === 409 || put.status === 422) { tplBusy = false; return tplSync(interactive); }
+      if (!put.ok) throw new Error('GitHub save ' + put.status);
+      tplLast = mine;
+    } else tplLast = mine;
+    const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    ghSay('Templates in sync with GitHub (' + t + ').'); if (interactive) toast('Templates in sync with GitHub.');
+  } catch (e) { ghSay('Template sync problem: ' + (e.message || e)); }
+  finally { tplBusy = false; }
+}
+function tplSoon() { if (!tplOn()) return; clearTimeout(tplTimer); tplTimer = setTimeout(() => tplSync(false), 4000); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) tplSync(false); });
+setInterval(() => { if (!document.hidden) tplSync(false); }, 120000);
+setTimeout(() => tplSync(false), 1200);
 $('#dashImportBtn').onclick = () => $('#dashImport').click();
 $('#dashImport').onchange = async e => {
   let found = 0, files = [...e.target.files];
